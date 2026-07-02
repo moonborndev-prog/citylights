@@ -28,13 +28,12 @@
     border-radius:10px;padding:9px 18px;font-size:13px;letter-spacing:.1em;
     font-family:inherit;transition:color .2s,border-color .2s}
   button:active{color:var(--amber);border-color:var(--amber)}
-  #toast{position:absolute;left:50%;top:44%;transform:translate(-50%,-50%);
-    text-align:center;opacity:0;pointer-events:none;transition:opacity .5s}
-  #toast.show{opacity:1;pointer-events:auto}
-  #toast h2{font-size:22px;font-weight:600;letter-spacing:.24em;text-transform:uppercase;
-    color:var(--amber);text-shadow:0 0 24px rgba(255,184,77,.5)}
-  #toast p{margin-top:6px;font-size:13px;color:var(--dim);letter-spacing:.08em}
-  #toast button{margin-top:16px;color:var(--amber);border-color:#5a4520}
+  #hintTxt.win{color:var(--amber);font-size:14px;font-weight:600;
+    letter-spacing:.2em;text-transform:uppercase;
+    text-shadow:0 0 18px rgba(255,184,77,.45)}
+  #hintTxt.win small{display:block;margin-top:3px;font-weight:400;font-size:11px;
+    color:var(--dim);text-transform:none;letter-spacing:.08em;text-shadow:none}
+  #nextBtn{color:var(--amber);border-color:#5a4520}
 </style>
 </head>
 <body>
@@ -49,21 +48,19 @@
 </header>
 <main>
   <canvas id="cv"></canvas>
-  <div id="toast">
-    <h2>Bina aydınlandı</h2>
-    <p id="toastSub"></p>
-    <button id="nextBtn">Sonraki bölüm</button>
-  </div>
 </main>
 <footer>
   <div id="hintTxt"></div>
-  <div class="btnrow"><button id="resetBtn">Sıfırla</button></div>
+  <div class="btnrow">
+    <button id="resetBtn">Sıfırla</button>
+    <button id="nextBtn" hidden>Sonraki bölüm</button>
+  </div>
 </footer>
 <script>
 (()=>{
 const cv=document.getElementById('cv'),ctx=cv.getContext('2d');
 const lvlEl=document.getElementById('lvl'),progEl=document.getElementById('prog');
-const toast=document.getElementById('toast'),toastSub=document.getElementById('toastSub');
+const nextBtnEl=document.getElementById('nextBtn');
 const hintTxt=document.getElementById('hintTxt');
 
 // '.' oda, X blok, 0-4 sayili blok, C uyuyan kedi, P kalin perde, / \ ayna
@@ -84,7 +81,7 @@ const LEVELS=[
 ];
 const TIPS={
   1:"Dokun: lamba yak · Basılı tut: işaret koy\nHer daire ışık almalı, iki lamba birbirini görmemeli",
-  6:"Uyuyan kediyi uyandırma: odasına lamba konmaz —\nama odası yine de ışık almalı",
+  6:"Uyuyan komşuyu uyandırma: odasına lamba konmaz —\nama odası yine de ışık almalı",
   8:"Kalın perdeli daire iki farklı lambadan ışık ister",
   10:"Ayna ışığı 90° kırar —\nlambalar aynadan da birbirini görebilir"
 };
@@ -147,7 +144,7 @@ function loadLevel(){
     hintTxt.appendChild(document.createTextNode(line));
   });
   hintTxt.className=level>=6?'tip':'';
-  toast.classList.remove('show');
+  nextBtnEl.hidden=true;
   recompute(null,false);
 }
 
@@ -254,8 +251,15 @@ function recompute(changed,place){
     }
     winMax=wMax;
     for(let i=0;i<=Math.min(wMax,PENT.length-1);i++)pluck(i,i*0.07,0.055);
-    setTimeout(()=>toast.classList.add('show'),wMax*70+600);
-    toastSub.textContent='Bölüm '+level+' tamamlandı';
+    setTimeout(()=>{
+      hintTxt.className='win';
+      hintTxt.innerHTML='';
+      hintTxt.appendChild(document.createTextNode('Bina aydınlandı'));
+      const sm=document.createElement('small');
+      sm.textContent=level<LEVELS.length?('Bölüm '+level+' tamamlandı'):'Tüm bölümler tamamlandı';
+      hintTxt.appendChild(sm);
+      nextBtnEl.hidden=level>=LEVELS.length;
+    },wMax*70+600);
     vib([20,40,20,40,60]);
   }
 }
@@ -307,43 +311,66 @@ function drawCat(wx,wy,ws,a,now,jit,dance){
   ctx.stroke();
   ctx.restore();
 }
-function drawSleepingCat(wx,wy,ws,a,now,jit){
-  // kivrilmis uyuyan kedi — karanlikta da soluk gorunur (mekanik hucre)
+function drawSleepingHuman(wx,wy,ws,a,now,jit){
+  // yatakta uyuyan komsu — karanlikta da soluk gorunur (mekanik hucre)
   ctx.save();
   const dark=a<0.25;
   const col=dark?'rgba(96,112,148,0.5)':'#0a0d16';
-  const cx=wx+ws*0.5,cy=wy+ws*0.66,R=ws*0.24;
-  const breath=1+0.04*Math.sin(now/650+jit*20);
-  if(dark){ctx.strokeStyle=col;ctx.lineWidth=Math.max(1.2,ws*0.035);ctx.fillStyle='rgba(0,0,0,0)'}
+  const breath=Math.sin(now/700+jit*20);
+  const bx=wx+ws*0.1,bw=ws*0.8,by=wy+ws*0.68,bh=ws*0.15;
+  if(dark){ctx.strokeStyle=col;ctx.lineWidth=Math.max(1.2,ws*0.035)}
   else ctx.fillStyle=col;
-  // kivrik govde
-  ctx.beginPath();
-  ctx.ellipse(cx,cy,R*1.15*breath,R*0.85*breath,0,0,Math.PI*2);
+  // yatak
+  dark?ctx.strokeRect(bx,by,bw,bh):ctx.fillRect(bx,by,bw,bh);
+  // yatak ayaklari
+  if(!dark){
+    ctx.fillRect(bx,by+bh,ws*0.05,ws*0.08);
+    ctx.fillRect(bx+bw-ws*0.05,by+bh,ws*0.05,ws*0.08);
+  }
+  // yastikta bas
+  const hx=bx+ws*0.13,hy=by-ws*0.05;
+  ctx.beginPath();ctx.arc(hx,hy,ws*0.075,0,Math.PI*2);
   dark?ctx.stroke():ctx.fill();
-  // tiklanmis bas (govdeye gomulu)
+  // battaniye tumsegi (nefesle inip kalkar)
   ctx.beginPath();
-  ctx.arc(cx+R*0.55,cy-R*0.15,R*0.5,0,Math.PI*2);
+  ctx.moveTo(bx+ws*0.22,by);
+  ctx.quadraticCurveTo(bx+bw*0.55,by-ws*(0.11+0.015*breath),bx+bw*0.96,by);
+  ctx.closePath();
   dark?ctx.stroke():ctx.fill();
-  // kulaklar
-  ctx.beginPath();
-  ctx.moveTo(cx+R*0.35,cy-R*0.55);ctx.lineTo(cx+R*0.42,cy-R*0.95);ctx.lineTo(cx+R*0.62,cy-R*0.62);
-  ctx.moveTo(cx+R*0.75,cy-R*0.52);ctx.lineTo(cx+R*0.95,cy-R*0.85);ctx.lineTo(cx+R*0.98,cy-R*0.45);
-  dark?ctx.stroke():ctx.fill();
-  // sarili kuyruk
-  ctx.strokeStyle=col;ctx.lineWidth=ws*0.05;ctx.lineCap='round';
-  ctx.beginPath();
-  ctx.arc(cx-R*0.1,cy+R*0.1,R*1.05,Math.PI*0.25,Math.PI*1.15);
-  ctx.stroke();
-  // zZ (uyku) — sadece isikliyken, nefesle senkron
+  // zZ — sadece isikliyken, nefesle senkron
   if(!dark){
     ctx.fillStyle='rgba(20,26,42,0.75)';
-    ctx.font=`600 ${ws*0.16}px -apple-system,sans-serif`;
+    ctx.font=`600 ${ws*0.15}px -apple-system,sans-serif`;
     ctx.textAlign='center';
-    const zb=Math.sin(now/650+jit*20)*ws*0.02;
-    ctx.fillText('z',cx-R*0.9,cy-R*1.1+zb);
-    ctx.font=`600 ${ws*0.12}px -apple-system,sans-serif`;
-    ctx.fillText('z',cx-R*1.25,cy-R*1.45+zb);
+    const zb=breath*ws*0.02;
+    ctx.fillText('z',hx+ws*0.14,hy-ws*0.14+zb);
+    ctx.font=`600 ${ws*0.11}px -apple-system,sans-serif`;
+    ctx.fillText('z',hx+ws*0.26,hy-ws*0.26+zb);
   }
+  ctx.restore();
+}
+function drawDancingHuman(wx,wy,ws,now,jit){
+  // uyanmis komsu minik dans eder
+  ctx.save();
+  ctx.fillStyle='#0a0d16';ctx.strokeStyle='#0a0d16';
+  const sway=Math.sin(now/160+jit*50)*ws*0.045;
+  const bob=Math.abs(Math.sin(now/140+jit*30))*ws*0.045;
+  const cx=wx+ws*0.5+sway,base=wy+ws*0.95-bob;
+  const H=ws*0.52;
+  ctx.beginPath();ctx.arc(cx,base-H*0.85,H*0.15,0,Math.PI*2);ctx.fill();
+  ctx.lineWidth=ws*0.055;ctx.lineCap='round';
+  ctx.beginPath();ctx.moveTo(cx,base-H*0.68);ctx.lineTo(cx,base-H*0.3);ctx.stroke();
+  const wave=Math.sin(now/130+jit*40);
+  ctx.beginPath();
+  ctx.moveTo(cx,base-H*0.6);
+  ctx.lineTo(cx-H*0.28,base-H*(0.88+0.12*wave));
+  ctx.moveTo(cx,base-H*0.6);
+  ctx.lineTo(cx+H*0.28,base-H*(0.88-0.12*wave));
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(cx,base-H*0.3);ctx.lineTo(cx-H*0.15,base);
+  ctx.moveTo(cx,base-H*0.3);ctx.lineTo(cx+H*0.15,base);
+  ctx.stroke();
   ctx.restore();
 }
 function drawWindowCell(x,y,s,st,jit,now,k){
@@ -407,8 +434,9 @@ function drawWindowCell(x,y,s,st,jit,now,k){
       ctx.fill();
     }
   }
-  if(st.sleepCat&&!st.party)drawSleepingCat(wx,wy,ws,a,now,jit);
-  if((st.decorCat&&!st.bulb)||(st.sleepCat&&st.party))drawCat(wx,wy,ws,Math.max(a,st.party?0.6:0),now,jit,st.party);
+  if(st.sleeper&&!st.party)drawSleepingHuman(wx,wy,ws,a,now,jit);
+  if(st.sleeper&&st.party)drawDancingHuman(wx,wy,ws,now,jit);
+  if(st.decorCat&&!st.bulb)drawCat(wx,wy,ws,Math.max(a,st.party?0.6:0),now,jit,st.party);
   // kayit citalari
   ctx.strokeStyle=a>0.3?'rgba(30,22,10,0.85)':'rgba(20,26,42,0.9)';
   ctx.lineWidth=Math.max(1.5,s*0.045);
@@ -541,7 +569,7 @@ function draw(now){
         mark:marks.has(k),
         conf:won?false:conflict.has(k),
         decorCat:t==='.'&&hueJit[idx(r,c)]>0.93,
-        sleepCat:t==='C',
+        sleeper:t==='C',
         curtain:t==='P',
         nsrc:sources[k]?Math.min(2,sources[k].size):0,
         party:party
