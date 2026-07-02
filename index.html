@@ -1,0 +1,635 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Aydınlat — Gece Işıkları</title>
+<style>
+  :root{--night:#070a13;--ink:#cfc9ba;--dim:#5b6478;--amber:#ffb84d}
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{height:100%;overflow:hidden;background:var(--night);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;color:var(--ink)}
+  body{display:flex;flex-direction:column;touch-action:none;user-select:none;-webkit-user-select:none}
+  header{display:flex;align-items:center;justify-content:space-between;padding:14px 18px 8px;letter-spacing:.14em}
+  #lvl{font-size:13px;color:var(--dim);text-transform:uppercase}
+  #lvlNav{display:flex;align-items:center;gap:8px}
+  button.nav{border:none;background:transparent;color:var(--dim);font-size:20px;
+    padding:0 6px;line-height:1;border-radius:6px}
+  button.nav:active{color:var(--amber)}
+  button.nav:disabled{opacity:.25}
+  #title{font-size:15px;font-weight:600;letter-spacing:.22em;text-transform:uppercase}
+  #prog{font-size:13px;color:var(--dim)}
+  main{flex:1;position:relative}
+  canvas{position:absolute;inset:0;width:100%;height:100%}
+  footer{display:flex;gap:10px;justify-content:center;align-items:center;padding:6px 16px 20px;flex-direction:column}
+  #hintTxt{font-size:11.5px;color:#3d4557;letter-spacing:.06em;text-align:center;min-height:2.4em}
+  #hintTxt.tip{color:#8a7a4e}
+  button{background:transparent;border:1px solid #232b3f;color:var(--dim);
+    border-radius:10px;padding:9px 18px;font-size:13px;letter-spacing:.1em;
+    font-family:inherit;transition:color .2s,border-color .2s}
+  button:active{color:var(--amber);border-color:var(--amber)}
+  #toast{position:absolute;left:50%;top:44%;transform:translate(-50%,-50%);
+    text-align:center;opacity:0;pointer-events:none;transition:opacity .5s}
+  #toast.show{opacity:1;pointer-events:auto}
+  #toast h2{font-size:22px;font-weight:600;letter-spacing:.24em;text-transform:uppercase;
+    color:var(--amber);text-shadow:0 0 24px rgba(255,184,77,.5)}
+  #toast p{margin-top:6px;font-size:13px;color:var(--dim);letter-spacing:.08em}
+  #toast button{margin-top:16px;color:var(--amber);border-color:#5a4520}
+</style>
+</head>
+<body>
+<header>
+  <span id="lvlNav">
+    <button id="prevLvl" class="nav">‹</button>
+    <span id="lvl">Bölüm 1</span>
+    <button id="nextLvl" class="nav">›</button>
+  </span>
+  <span id="title">Aydınlat</span>
+  <span id="prog">0%</span>
+</header>
+<main>
+  <canvas id="cv"></canvas>
+  <div id="toast">
+    <h2>Bina aydınlandı</h2>
+    <p id="toastSub"></p>
+    <button id="nextBtn">Sonraki bölüm</button>
+  </div>
+</main>
+<footer>
+  <div id="hintTxt"></div>
+  <div class="btnrow"><button id="resetBtn">Sıfırla</button></div>
+</footer>
+<script>
+(()=>{
+const cv=document.getElementById('cv'),ctx=cv.getContext('2d');
+const lvlEl=document.getElementById('lvl'),progEl=document.getElementById('prog');
+const toast=document.getElementById('toast'),toastSub=document.getElementById('toastSub');
+const hintTxt=document.getElementById('hintTxt');
+
+// '.' oda, X blok, 0-4 sayili blok, C uyuyan kedi, P kalin perde, / \ ayna
+// Tum seviyeler cozucu ile dogrulandi: tek cozum.
+const LEVELS=[
+  ["X...",".X..","..4.","...."],
+  [".3...",".....","X.1..","..1X.","....."],
+  [".2.3..",".12...","2.....","......",".....1","...0.."],
+  ["......","3.....",".....0",".1....",".0..20",".10...","......"],
+  ["11....",".2....","......","..1..1","1....1",".1..2.",".1....","......"],
+  ["..1.C","...C.","0..3.","1....","....."],
+  ["2..CC","...C.","....0",".1..1","....1","....."],
+  ["11...","....0",".....","...2.",".P...","...C0"],
+  [".2....",".0.2..",".1...P","C.....","1..0..",".CP..."],
+  [".....X","3.....","..2...","......","\\....\\",".X...."],
+  ["......","21....","......","2.C...","11\\...",".P....","/.C..."],
+  ["......",".0\\..0",".2.3..","..C...","....C1","\\..1..","......","P.P.\\."]
+];
+const TIPS={
+  1:"Dokun: lamba yak · Basılı tut: işaret koy\nHer daire ışık almalı, iki lamba birbirini görmemeli",
+  6:"Uyuyan kediyi uyandırma: odasına lamba konmaz —\nama odası yine de ışık almalı",
+  8:"Kalın perdeli daire iki farklı lambadan ışık ister",
+  10:"Ayna ışığı 90° kırar —\nlambalar aynadan da birbirini görebilir"
+};
+const DIRS=[[1,0],[-1,0],[0,1],[0,-1]];
+
+// ---------- ses / haptik ----------
+let AC=null;
+function tone(f,d=0.09,g=0.05,at=0){
+  try{
+    AC=AC||new (window.AudioContext||window.webkitAudioContext)();
+    if(AC.state==='suspended')AC.resume();
+    const t0=AC.currentTime+at;
+    const o=AC.createOscillator(),v=AC.createGain();
+    o.type='triangle';o.frequency.value=f;
+    v.gain.setValueAtTime(0.0001,t0);
+    v.gain.exponentialRampToValueAtTime(g,t0+0.012);
+    v.gain.exponentialRampToValueAtTime(0.0001,t0+d);
+    o.connect(v).connect(AC.destination);o.start(t0);o.stop(t0+d+0.02);
+  }catch(e){}
+}
+function vib(ms){if(navigator.vibrate)navigator.vibrate(ms)}
+const PENT=[0,2,4,7,9,12,14,16,19,21,24];
+function pluck(step,at=0,g=0.045){tone(392*Math.pow(2,PENT[Math.min(step,PENT.length-1)]/12),0.12,g,at)}
+
+// ---------- durum ----------
+let level=parseInt(localStorage.getItem('aydinlat_lvl')||'1');
+if(level>LEVELS.length)level=1;
+let rows,cols,cellType;
+let bulbs,marks;
+let sources,conflict,numState,activeMirrors;
+let alpha={},target={},delayUntil={},placedAt={},denyAt={},winD={};
+let won=false,winT=0,hueJit=[],litRatio=0,winMax=0;
+
+function key(r,c){return r+','+c}
+function idx(r,c){return r*cols+c}
+function isRoom(t){return t==='.'||t==='C'||t==='P'}
+
+function loadLevel(){
+  const L=LEVELS[level-1];
+  rows=L.length;cols=L[0].length;
+  cellType=L.map(s=>s.split(''));
+  bulbs=new Set();marks=new Set();
+  alpha={};target={};delayUntil={};placedAt={};denyAt={};winD={};
+  won=false;winT=0;litRatio=0;winMax=0;
+  hueJit=[];
+  let seed=level*7919+5;
+  for(let i=0;i<rows*cols;i++){seed=(seed*1103515245+12345)&0x7fffffff;hueJit.push((seed>>8)/8388608%1)}
+  for(let r=0;r<rows;r++)for(let c=0;c<cols;c++){
+    const k=key(r,c);alpha[k]=0;target[k]=0;delayUntil[k]=0;
+  }
+  lvlEl.textContent='Bölüm '+level;
+  const pb=document.getElementById('prevLvl'),nb=document.getElementById('nextLvl');
+  if(pb){pb.disabled=level<=1;nb.disabled=level>=LEVELS.length}
+  // ipucu metni: son tanitilan mekanik
+  let tip=TIPS[1];
+  for(const n of Object.keys(TIPS).map(Number))if(n<=level)tip=TIPS[n];
+  hintTxt.textContent='';
+  tip.split('\n').forEach((line,i)=>{
+    if(i)hintTxt.appendChild(document.createElement('br'));
+    hintTxt.appendChild(document.createTextNode(line));
+  });
+  hintTxt.className=level>=6?'tip':'';
+  toast.classList.remove('show');
+  recompute(null,false);
+}
+
+// (r,c)'den isin yay: {cells:Map(key->dist), mirrors:Set}
+function castFrom(r,c){
+  const cells=new Map([[key(r,c),0]]);
+  const mirrors=new Set();
+  DIRS.forEach(d0=>{
+    let dr=d0[0],dc=d0[1],nr=r+dr,nc=c+dc,d=1;
+    const seen=new Set();
+    while(nr>=0&&nr<rows&&nc>=0&&nc<cols){
+      const t=cellType[nr][nc];
+      if(t==='/'){const tmp=dr;dr=-dc;dc=-tmp;mirrors.add(key(nr,nc))}
+      else if(t==='\\'){const tmp=dr;dr=dc;dc=tmp;mirrors.add(key(nr,nc))}
+      else if(isRoom(t)){
+        const k=key(nr,nc);
+        if(!cells.has(k)||cells.get(k)>d)cells.set(k,d);
+      }
+      else break;
+      const st=nr+','+nc+','+dr+','+dc;
+      if(seen.has(st))break;
+      seen.add(st);
+      nr+=dr;nc+=dc;d++;
+    }
+  });
+  return{cells,mirrors};
+}
+
+function recompute(changed,place){
+  const now=performance.now();
+  sources={};conflict=new Set();activeMirrors=new Set();
+  const dist={}; // degisen noktadan dalga mesafesi
+  bulbs.forEach(b=>{
+    const[r,c]=b.split(',').map(Number);
+    const{cells,mirrors}=castFrom(r,c);
+    mirrors.forEach(m=>activeMirrors.add(m));
+    cells.forEach((d,k)=>{
+      (sources[k]=sources[k]||new Set()).add(b);
+      if(k!==b&&bulbs.has(k)){conflict.add(b);conflict.add(k)}
+      if(changed&&b===key(changed[0],changed[1]))
+        dist[k]=Math.min(dist[k]??99,d);
+    });
+  });
+  if(changed&&!place){ // geri cekilme dalgasi: kaldirilan noktadan
+    const{cells}=castFrom(changed[0],changed[1]);
+    cells.forEach((d,k)=>{if(!(k in dist))dist[k]=d});
+  }
+  // sayili bloklar
+  numState={};
+  for(let r=0;r<rows;r++)for(let c=0;c<cols;c++){
+    const t=cellType[r][c];
+    if(t>='0'&&t<='4'){
+      const need=+t;let cnt=0;
+      DIRS.forEach(([dr,dc])=>{if(bulbs.has(key(r+dr,c+dc)))cnt++});
+      numState[key(r,c)]=cnt===need?'ok':cnt>need?'over':'under';
+    }
+  }
+  // hedef alfa + dalga gecikmesi
+  let maxD=0,tot=0,sat=0;
+  for(let r=0;r<rows;r++)for(let c=0;c<cols;c++){
+    const t=cellType[r][c];
+    if(!isRoom(t))continue;
+    const k=key(r,c);
+    const ns=sources[k]?sources[k].size:0;
+    let nt;
+    if(t==='P')nt=bulbs.has(k)?(ns>=2?1:0.5):(ns>=2?0.6:ns===1?0.26:0);
+    else nt=bulbs.has(k)?1:ns>=1?0.6:0;
+    if(nt!==target[k]){
+      const d=dist[k]??0;
+      delayUntil[k]=now+d*(nt>target[k]?55:38);
+      maxD=Math.max(maxD,d);
+      target[k]=nt;
+    }
+    tot++;
+    const ok=t==='P'?ns>=2:(ns>=1||bulbs.has(k));
+    if(ok)sat++;
+  }
+  if(changed&&maxD>0){
+    const steps=Math.min(maxD,6);
+    for(let i=0;i<=steps;i++)
+      place?pluck(i,i*0.055,0.035):pluck(Math.max(0,steps-i),i*0.038,0.025);
+  }
+  litRatio=sat/tot;
+  progEl.textContent=Math.round(litRatio*100)+'%';
+  // kazanma
+  if(sat===tot&&conflict.size===0&&Object.values(numState).every(s=>s==='ok')&&!won){
+    won=true;winT=now;
+    const src=changed||[0,0];
+    const D=Array.from({length:rows},()=>new Array(cols).fill(-1));
+    const q=[[src[0],src[1]]];D[src[0]][src[1]]=0;
+    while(q.length){
+      const[r,c]=q.shift();
+      DIRS.forEach(([dr,dc])=>{
+        const nr=r+dr,nc=c+dc;
+        if(nr>=0&&nr<rows&&nc>=0&&nc<cols&&D[nr][nc]<0){
+          D[nr][nc]=D[r][c]+1;q.push([nr,nc]);
+        }
+      });
+    }
+    let wMax=0;
+    for(let r=0;r<rows;r++)for(let c=0;c<cols;c++){
+      const k=key(r,c);winD[k]=D[r][c];wMax=Math.max(wMax,D[r][c]);
+      if(isRoom(cellType[r][c])){target[k]=1;delayUntil[k]=now+D[r][c]*70}
+    }
+    winMax=wMax;
+    for(let i=0;i<=Math.min(wMax,PENT.length-1);i++)pluck(i,i*0.07,0.055);
+    setTimeout(()=>toast.classList.add('show'),wMax*70+600);
+    toastSub.textContent='Bölüm '+level+' tamamlandı';
+    vib([20,40,20,40,60]);
+  }
+}
+
+// ---------- yerlesim ----------
+let W,H,cell,gx,gy,dpr;
+function resize(){
+  dpr=Math.min(2,window.devicePixelRatio||1);
+  const r=cv.parentElement.getBoundingClientRect();
+  W=r.width;H=r.height;
+  cv.width=W*dpr;cv.height=H*dpr;
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  const pad=26;
+  cell=Math.min((W-pad*2)/cols,(H-pad*2)/rows);
+  gx=(W-cell*cols)/2;gy=(H-cell*rows)/2;
+}
+window.addEventListener('resize',resize);
+
+// ---------- cizim ----------
+function roundRect(x,y,w,h,r){
+  ctx.beginPath();
+  ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,x+w,y+h,r);ctx.arcTo(x+w,y+h,x,y+h,r);
+  ctx.arcTo(x,y+h,x,y,r);ctx.arcTo(x,y,x+w,y,r);ctx.closePath();
+}
+function drawCat(wx,wy,ws,a,now,jit,dance){
+  // oturan kedi (dekoratif) — parti modunda dans
+  ctx.save();
+  ctx.globalAlpha=Math.min(1,a*1.2);
+  ctx.fillStyle='#0a0d16';
+  const sway=dance?Math.sin(now/170+jit*50)*ws*0.05:0;
+  const bob=dance?Math.abs(Math.sin(now/140+jit*30))*ws*0.06:0;
+  const tilt=dance?Math.sin(now/210+jit*70)*0.15:0;
+  const cx=wx+ws*0.5+sway,base=wy+ws*0.97-bob,h=ws*0.46,w=ws*0.34;
+  ctx.translate(cx,base);ctx.rotate(tilt);ctx.translate(-cx,-base);
+  ctx.beginPath();
+  ctx.ellipse(cx,base-h*0.28,w*0.5,h*0.34,0,0,Math.PI*2);ctx.fill();
+  ctx.beginPath();
+  ctx.arc(cx,base-h*0.72,w*0.3,0,Math.PI*2);ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(cx-w*0.28,base-h*0.82);ctx.lineTo(cx-w*0.16,base-h*1.05);ctx.lineTo(cx-w*0.04,base-h*0.88);
+  ctx.moveTo(cx+w*0.28,base-h*0.82);ctx.lineTo(cx+w*0.16,base-h*1.05);ctx.lineTo(cx+w*0.04,base-h*0.88);
+  ctx.fill();
+  ctx.strokeStyle='#0a0d16';
+  ctx.lineWidth=ws*0.05;ctx.lineCap='round';
+  const wag=dance?Math.sin(now/120+jit*60)*w*0.3:0;
+  ctx.beginPath();
+  ctx.moveTo(cx+w*0.45,base-h*0.15);
+  ctx.quadraticCurveTo(cx+w*0.95+wag,base-h*0.3,cx+w*0.8+wag*0.6,base-h*0.7);
+  ctx.stroke();
+  ctx.restore();
+}
+function drawSleepingCat(wx,wy,ws,a,now,jit){
+  // kivrilmis uyuyan kedi — karanlikta da soluk gorunur (mekanik hucre)
+  ctx.save();
+  const dark=a<0.25;
+  const col=dark?'rgba(96,112,148,0.5)':'#0a0d16';
+  const cx=wx+ws*0.5,cy=wy+ws*0.66,R=ws*0.24;
+  const breath=1+0.04*Math.sin(now/650+jit*20);
+  if(dark){ctx.strokeStyle=col;ctx.lineWidth=Math.max(1.2,ws*0.035);ctx.fillStyle='rgba(0,0,0,0)'}
+  else ctx.fillStyle=col;
+  // kivrik govde
+  ctx.beginPath();
+  ctx.ellipse(cx,cy,R*1.15*breath,R*0.85*breath,0,0,Math.PI*2);
+  dark?ctx.stroke():ctx.fill();
+  // tiklanmis bas (govdeye gomulu)
+  ctx.beginPath();
+  ctx.arc(cx+R*0.55,cy-R*0.15,R*0.5,0,Math.PI*2);
+  dark?ctx.stroke():ctx.fill();
+  // kulaklar
+  ctx.beginPath();
+  ctx.moveTo(cx+R*0.35,cy-R*0.55);ctx.lineTo(cx+R*0.42,cy-R*0.95);ctx.lineTo(cx+R*0.62,cy-R*0.62);
+  ctx.moveTo(cx+R*0.75,cy-R*0.52);ctx.lineTo(cx+R*0.95,cy-R*0.85);ctx.lineTo(cx+R*0.98,cy-R*0.45);
+  dark?ctx.stroke():ctx.fill();
+  // sarili kuyruk
+  ctx.strokeStyle=col;ctx.lineWidth=ws*0.05;ctx.lineCap='round';
+  ctx.beginPath();
+  ctx.arc(cx-R*0.1,cy+R*0.1,R*1.05,Math.PI*0.25,Math.PI*1.15);
+  ctx.stroke();
+  // zZ (uyku) — sadece isikliyken, nefesle senkron
+  if(!dark){
+    ctx.fillStyle='rgba(20,26,42,0.75)';
+    ctx.font=`600 ${ws*0.16}px -apple-system,sans-serif`;
+    ctx.textAlign='center';
+    const zb=Math.sin(now/650+jit*20)*ws*0.02;
+    ctx.fillText('z',cx-R*0.9,cy-R*1.1+zb);
+    ctx.font=`600 ${ws*0.12}px -apple-system,sans-serif`;
+    ctx.fillText('z',cx-R*1.25,cy-R*1.45+zb);
+  }
+  ctx.restore();
+}
+function drawWindowCell(x,y,s,st,jit,now,k){
+  const m=s*0.13;
+  let wx=x+m,wy=y+m;const ws=s-m*2;
+  // kedi reddi sarsintisi
+  if(denyAt[k]){
+    const el=now-denyAt[k];
+    if(el<300)wx+=Math.sin(el/22)*(1-el/300)*s*0.05;
+    else delete denyAt[k];
+  }
+  ctx.fillStyle='#05070e';
+  ctx.fillRect(wx-1,wy-1,ws+2,ws+2);
+  let a=alpha[k];
+  let flare=0;
+  if(won&&winD[k]>=0){
+    const p=now-winT-winD[k]*70;
+    if(p>0&&p<340)flare=Math.sin(p/340*Math.PI)*0.5;
+  }
+  let hue=st.bulb?45:33;
+  if(st.bulb&&placedAt[k]){
+    const age=now-placedAt[k];
+    if(age<260)hue=14+(45-14)*(age/260);
+  }
+  if(a>0.02){
+    const flick=0.94+0.06*Math.sin(now/900+jit*40);
+    const aa=Math.min(1,a*flick+flare);
+    const g=ctx.createRadialGradient(wx+ws/2,wy+ws/2,ws*0.1,wx+ws/2,wy+ws/2,ws*0.75);
+    g.addColorStop(0,`hsla(${hue+6},${st.bulb?60:86}%,${(st.bulb?84:72)+flare*14}%,${aa})`);
+    g.addColorStop(1,`hsla(${hue},${st.bulb?56:80}%,${(st.bulb?64:50)+flare*12}%,${aa*0.9})`);
+    ctx.fillStyle=g;ctx.fillRect(wx,wy,ws,ws);
+    if(st.bulb||flare>0.1){
+      ctx.save();
+      ctx.shadowColor=st.conf?'rgba(255,95,77,0.7)':`hsla(${hue},90%,60%,${0.6+flare*0.4})`;
+      ctx.shadowBlur=s*(0.35+flare*0.3);
+      ctx.fillStyle=st.conf?'rgba(255,95,77,0.25)':`hsla(${hue},85%,58%,${0.25+flare*0.2})`;
+      ctx.fillRect(wx,wy,ws,ws);
+      ctx.restore();
+    }
+  }else{
+    ctx.fillStyle='#0b0f1b';ctx.fillRect(wx,wy,ws,ws);
+    ctx.fillStyle='rgba(48,60,92,0.16)';ctx.fillRect(wx,wy,ws,ws*0.32);
+  }
+  // perde dokusu (P): ust ve yanlarda kalin drape
+  if(st.curtain){
+    ctx.fillStyle=a>0.3?'rgba(64,32,20,0.75)':'rgba(28,24,38,0.9)';
+    ctx.fillRect(wx,wy,ws,ws*0.2);
+    const nWaves=4;
+    for(let i=0;i<nWaves;i++){
+      const px=wx+ws*(0.06+i*0.9/nWaves);
+      ctx.fillRect(px,wy,ws*0.07,ws*(0.32+((i%2)?0.1:0)));
+    }
+    ctx.fillRect(wx,wy,ws*0.12,ws);
+    ctx.fillRect(wx+ws*0.88,wy,ws*0.12,ws);
+    // kaynak noktalari: 2 gerekli
+    const ns=st.nsrc;
+    for(let i=0;i<2;i++){
+      ctx.beginPath();
+      ctx.arc(wx+ws*0.5+(i?ws*0.11:-ws*0.11),wy+ws*0.9,ws*0.05,0,Math.PI*2);
+      ctx.fillStyle=i<ns?'#ffb84d':'rgba(122,130,152,0.45)';
+      ctx.fill();
+    }
+  }
+  if(st.sleepCat&&!st.party)drawSleepingCat(wx,wy,ws,a,now,jit);
+  if((st.decorCat&&!st.bulb)||(st.sleepCat&&st.party))drawCat(wx,wy,ws,Math.max(a,st.party?0.6:0),now,jit,st.party);
+  // kayit citalari
+  ctx.strokeStyle=a>0.3?'rgba(30,22,10,0.85)':'rgba(20,26,42,0.9)';
+  ctx.lineWidth=Math.max(1.5,s*0.045);
+  ctx.beginPath();
+  ctx.moveTo(wx+ws/2,wy);ctx.lineTo(wx+ws/2,wy+ws);
+  ctx.moveTo(wx,wy+ws/2);ctx.lineTo(wx+ws,wy+ws/2);
+  ctx.stroke();
+  if(st.bulb){
+    const cx=wx+ws/2,cy=wy+ws/2,r=ws*0.16;
+    const pulse=st.conf?(0.8+0.2*Math.sin(now/120)):1;
+    let pop=1;
+    if(placedAt[k]){const age=now-placedAt[k];if(age<220)pop=1+0.35*Math.sin(age/220*Math.PI)}
+    ctx.fillStyle=st.conf?`rgba(255,95,77,${pulse})`:'rgba(255,244,214,0.95)';
+    ctx.beginPath();ctx.arc(cx,cy-r*0.2,r*pop,0,Math.PI*2);ctx.fill();
+    ctx.fillRect(cx-r*0.45*pop,cy+r*0.55,r*0.9*pop,r*0.55);
+    ctx.strokeStyle='rgba(60,40,10,0.5)';
+    ctx.lineWidth=1;
+    ctx.beginPath();ctx.moveTo(cx,cy-r);ctx.lineTo(cx,wy);ctx.stroke();
+  }
+  if(st.mark&&!st.bulb){
+    ctx.strokeStyle='rgba(120,130,155,0.55)';
+    ctx.lineWidth=Math.max(1.5,s*0.04);
+    const p=ws*0.3;
+    ctx.beginPath();
+    ctx.moveTo(wx+p,wy+p);ctx.lineTo(wx+ws-p,wy+ws-p);
+    ctx.moveTo(wx+ws-p,wy+p);ctx.lineTo(wx+p,wy+ws-p);
+    ctx.stroke();
+  }
+  ctx.strokeStyle=st.conf?'rgba(255,95,77,0.8)':a>0.3?'rgba(70,50,22,0.9)':'#1b2233';
+  ctx.lineWidth=Math.max(1.5,s*0.05);
+  ctx.strokeRect(wx,wy,ws,ws);
+}
+function drawMirror(x,y,s,t,k,now,active){
+  const m=s*0.08;
+  // koyu cam panel
+  ctx.fillStyle='#0c1220';
+  ctx.fillRect(x+m,y+m,s-m*2,s-m*2);
+  ctx.strokeStyle='#0a0d16';
+  ctx.lineWidth=2;
+  ctx.strokeRect(x+m,y+m,s-m*2,s-m*2);
+  const x1=t==='/'?x+m:x+m, y1=t==='/'?y+s-m:y+m;
+  const x2=x+s-m, y2=t==='/'?y+m:y+s-m;
+  const pulse=active?0.7+0.3*Math.sin(now/300):0;
+  ctx.save();
+  if(active){
+    ctx.shadowColor=`rgba(255,200,120,${0.5*pulse})`;
+    ctx.shadowBlur=s*0.25;
+  }
+  const g=ctx.createLinearGradient(x1,y1,x2,y2);
+  g.addColorStop(0,active?'rgba(255,214,150,0.9)':'rgba(150,168,200,0.7)');
+  g.addColorStop(0.5,active?'rgba(255,240,210,1)':'rgba(200,214,236,0.95)');
+  g.addColorStop(1,active?'rgba(255,214,150,0.9)':'rgba(150,168,200,0.7)');
+  ctx.strokeStyle=g;
+  ctx.lineWidth=Math.max(2,s*0.07);
+  ctx.lineCap='round';
+  ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.stroke();
+  ctx.restore();
+}
+function drawBlock(x,y,s,t,k,now){
+  const m=s*0.06;
+  let flare=0;
+  if(won&&winD[k]>=0){
+    const p=now-winT-winD[k]*70;
+    if(p>0&&p<340)flare=Math.sin(p/340*Math.PI)*0.25;
+  }
+  ctx.fillStyle=`rgb(${20+flare*60},${24+flare*40},${38+flare*20})`;
+  ctx.fillRect(x+m,y+m,s-m*2,s-m*2);
+  ctx.strokeStyle='#0a0d16';
+  ctx.lineWidth=2;
+  ctx.strokeRect(x+m,y+m,s-m*2,s-m*2);
+  ctx.strokeStyle='rgba(255,255,255,0.03)';
+  ctx.lineWidth=1;
+  for(let i=1;i<4;i++){
+    ctx.beginPath();
+    ctx.moveTo(x+m*2,y+m+((s-m*2)/4)*i);
+    ctx.lineTo(x+s-m*2,y+m+((s-m*2)/4)*i);
+    ctx.stroke();
+  }
+  if(t>='0'&&t<='4'){
+    const st=numState[k];
+    ctx.fillStyle=st==='ok'?'#ffb84d':st==='over'?'#ff5f4d':'#7a8298';
+    ctx.font=`600 ${s*0.42}px -apple-system,sans-serif`;
+    ctx.textAlign='center';ctx.textBaseline='middle';
+    if(st==='ok'){
+      ctx.save();
+      ctx.shadowColor='rgba(255,184,77,0.6)';ctx.shadowBlur=8;
+      ctx.fillText(t,x+s/2,y+s/2+1);
+      ctx.restore();
+    }else ctx.fillText(t,x+s/2,y+s/2+1);
+  }
+}
+
+let lastFrame=performance.now();
+function draw(now){
+  const dt=Math.min(0.05,(now-lastFrame)/1000);lastFrame=now;
+  const party=won&&now>winT+winMax*70+500;
+  for(let r=0;r<rows;r++)for(let c=0;c<cols;c++){
+    if(!isRoom(cellType[r][c]))continue;
+    const k=key(r,c);
+    if(party){
+      const j=hueJit[idx(r,c)];
+      const v=Math.sin(now/(220+j*380)+j*40);
+      const hasCat=j>0.93||cellType[r][c]==='C';
+      alpha[k]=hasCat?0.65+0.35*Math.max(0,v):(v>0?0.9+0.1*v:0.12);
+    }else if(now>=delayUntil[k]){
+      const diff=target[k]-alpha[k];
+      alpha[k]+=diff*Math.min(1,dt*9);
+      if(Math.abs(diff)<0.01)alpha[k]=target[k];
+    }
+  }
+  ctx.clearRect(0,0,W,H);
+  const warm=litRatio*0.5+(won?0.5:0);
+  const fp=cell*0.32;
+  ctx.fillStyle=`rgb(${14+warm*10},${18+warm*7},${32+warm*4})`;
+  roundRect(gx-fp,gy-fp,cell*cols+fp*2,cell*rows+fp*2,10);
+  ctx.fill();
+  ctx.strokeStyle='rgba(255,255,255,0.025)';
+  ctx.lineWidth=1;
+  for(let r=1;r<rows;r++){
+    ctx.beginPath();
+    ctx.moveTo(gx-fp,gy+r*cell);ctx.lineTo(gx+cell*cols+fp,gy+r*cell);
+    ctx.stroke();
+  }
+  for(let r=0;r<rows;r++)for(let c=0;c<cols;c++){
+    const t=cellType[r][c],k=key(r,c);
+    const x=gx+c*cell,y=gy+r*cell;
+    if(isRoom(t)){
+      drawWindowCell(x,y,cell,{
+        bulb:bulbs.has(k),
+        mark:marks.has(k),
+        conf:won?false:conflict.has(k),
+        decorCat:t==='.'&&hueJit[idx(r,c)]>0.93,
+        sleepCat:t==='C',
+        curtain:t==='P',
+        nsrc:sources[k]?Math.min(2,sources[k].size):0,
+        party:party
+      },hueJit[idx(r,c)],now,k);
+    }else if(t==='/'||t==='\\'){
+      drawMirror(x,y,cell,t,k,now,activeMirrors.has(k)||won);
+    }else{
+      drawBlock(x,y,cell,t,k,now);
+    }
+  }
+  requestAnimationFrame(draw);
+}
+
+// ---------- girdi ----------
+let pressTimer=null,pressCell=null,longFired=false;
+function cellAt(e){
+  const r=cv.getBoundingClientRect();
+  const x=e.clientX-r.left,y=e.clientY-r.top;
+  const c=Math.floor((x-gx)/cell),rr=Math.floor((y-gy)/cell);
+  if(c<0||c>=cols||rr<0||rr>=rows)return null;
+  return[rr,c];
+}
+cv.addEventListener('pointerdown',e=>{
+  if(won)return;
+  const p=cellAt(e);if(!p)return;
+  const[r,c]=p,t=cellType[r][c];
+  if(t!=='.'&&t!=='P')return; // C dahil digerlerine islem yok (C reddi pointerup'ta)
+  pressCell=p;longFired=false;
+  pressTimer=setTimeout(()=>{
+    longFired=true;
+    const k=key(r,c);
+    if(bulbs.has(k))return;
+    if(marks.has(k))marks.delete(k);else marks.add(k);
+    vib(20);tone(260,0.05,0.03);
+  },350);
+});
+cv.addEventListener('pointerup',e=>{
+  clearTimeout(pressTimer);
+  if(won)return;
+  const p=cellAt(e);
+  if(p){
+    const[r,c]=p,t=cellType[r][c],k=key(r,c);
+    if(t==='C'){ // kediyi uyandirma!
+      denyAt[k]=performance.now();
+      vib([15,30,15]);tone(180,0.12,0.045);
+      pressCell=null;return;
+    }
+  }
+  if(longFired||!pressCell)return;
+  if(!p||p[0]!==pressCell[0]||p[1]!==pressCell[1]){pressCell=null;return}
+  const[r,c]=p,k=key(r,c);
+  if(bulbs.has(k)){
+    bulbs.delete(k);
+    delete placedAt[k];
+    vib(10);
+    recompute(p,false);
+  }else{
+    if(marks.has(k))marks.delete(k);
+    bulbs.add(k);
+    placedAt[k]=performance.now();
+    vib(14);
+    recompute(p,true);
+  }
+  pressCell=null;
+});
+cv.addEventListener('pointercancel',()=>{clearTimeout(pressTimer);pressCell=null});
+
+function gotoLevel(n){
+  level=Math.max(1,Math.min(LEVELS.length,n));
+  localStorage.setItem('aydinlat_lvl',String(level));
+  loadLevel();resize();vib(8);
+}
+const prevBtn=document.getElementById('prevLvl'),nextLvlBtn=document.getElementById('nextLvl');
+prevBtn.addEventListener('click',()=>gotoLevel(level-1));
+nextLvlBtn.addEventListener('click',()=>gotoLevel(level+1));
+document.getElementById('resetBtn').addEventListener('click',()=>{
+  loadLevel();resize();vib(8);
+});
+document.getElementById('nextBtn').addEventListener('click',()=>{
+  level=level%LEVELS.length+1;
+  localStorage.setItem('aydinlat_lvl',String(level));
+  loadLevel();resize();
+});
+
+loadLevel();
+resize();
+requestAnimationFrame(draw);
+})();
+</script>
+</body>
+</html>
