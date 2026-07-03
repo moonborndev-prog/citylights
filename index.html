@@ -34,8 +34,10 @@
   #title{font-size:15px;font-weight:600;letter-spacing:.22em;text-transform:uppercase}
   main{flex:1;position:relative}
   canvas{position:absolute;inset:0;width:100%;height:100%}
-  footer{display:flex;gap:18px;justify-content:center;align-items:center;padding:8px 16px 18px}
-  #hintTxt{display:none;font-size:11px;color:#3d4557;letter-spacing:.06em;text-align:center;padding:2px 14px 4px}
+  footer{display:flex;gap:18px;justify-content:center;align-items:center;
+    padding:8px 16px 18px;min-height:84px;box-sizing:border-box}
+  #hintTxt{display:none;position:absolute;left:0;right:0;bottom:5px;z-index:3;pointer-events:none;
+    font-size:11px;color:#3d4557;letter-spacing:.06em;text-align:center;padding:2px 14px 4px}
   #hintTxt.show{display:block}
   #tooltip{position:absolute;background:#141a2b;border:1px solid #2c3550;color:#cfc9ba;
     font-size:11px;line-height:1.45;padding:7px 11px;border-radius:10px;max-width:230px;
@@ -57,9 +59,7 @@
     font-size:16px;font-weight:700;letter-spacing:.14em;
     box-shadow:0 6px 22px rgba(47,158,92,.28)}
   #playBtn:active{background:#27874e;color:#eafff2}
-  @keyframes lwink{0%,100%{opacity:1}45%{opacity:.5}55%{opacity:.62}}
   @keyframes lbreathe{0%,100%{opacity:1}50%{opacity:.82}}
-  #logoLit{animation:lwink 3.2s ease-in-out infinite}
   #logoWord{animation:lbreathe 5.4s ease-in-out infinite}
   .city{width:100%;max-width:360px;background:#10152600;border:1px solid #1d2436;
     border-radius:18px;padding:16px 18px;margin-bottom:14px;
@@ -110,7 +110,29 @@
     text-shadow:0 0 18px rgba(255,184,77,.45)}
   #hintTxt.win small{display:block;margin-top:3px;font-weight:400;font-size:11px;
     color:var(--dim);text-transform:none;letter-spacing:.08em;text-shadow:none}
-  #nextBtn,#menuBtn{color:var(--amber);border-color:#5a4520}
+  /* win butonlari: mobil oyun CTA'si — dolgun, basilabilir, hiyerarsili */
+  #nextBtn{
+    background:linear-gradient(180deg,#ffd98f,#f0a83e);
+    color:#241a08;border:none;font-weight:700;
+    padding:14px 30px;border-radius:16px;font-size:15px;letter-spacing:.04em;
+    box-shadow:0 6px 22px rgba(255,184,77,.30),0 3px 0 #8a5f1e;
+    transition:transform .08s,box-shadow .08s;
+  }
+  #nextBtn:active{
+    color:#241a08;transform:translateY(3px);
+    box-shadow:0 3px 12px rgba(255,184,77,.22),0 0 0 #8a5f1e;
+  }
+  #menuBtn{
+    background:#151b2c;color:var(--amber);
+    border:1.5px solid #4a3d22;font-weight:600;
+    padding:14px 26px;border-radius:16px;font-size:15px;letter-spacing:.04em;
+    box-shadow:0 3px 0 #0b0f1a;
+    transition:transform .08s,box-shadow .08s;
+  }
+  #menuBtn:active{
+    color:var(--amber);border-color:#6a5730;transform:translateY(3px);
+    box-shadow:0 0 0 #0b0f1a;
+  }
 </style>
 </head>
 <body>
@@ -143,8 +165,8 @@
 <main>
   <canvas id="cv"></canvas>
   <div id="tooltip"></div>
+  <div id="hintTxt"></div>
 </main>
-<div id="hintTxt"></div>
 <footer>
   <button id="resetBtn">Reset</button>
   <button id="boostBtn">💡<span class="badge" id="hintCount">3</span></button>
@@ -165,18 +187,37 @@
       </linearGradient>
     </defs>
     <g>
-      <rect x="87"  y="8" width="18" height="18" rx="3" fill="#0b0f1b" stroke="#1b2233" stroke-width="2"/>
-      <rect x="111" y="8" width="18" height="18" rx="3" fill="#0b0f1b" stroke="#1b2233" stroke-width="2"/>
-      <rect id="logoLit" x="135" y="8" width="18" height="18" rx="3" fill="url(#wl)" stroke="#5a4520" stroke-width="2" filter="url(#lg)"/>
-      <rect x="159" y="8" width="18" height="18" rx="3" fill="#0b0f1b" stroke="#1b2233" stroke-width="2"/>
-      <line x1="144" y1="8" x2="144" y2="26" stroke="#30240c" stroke-width="1.6"/>
-      <line x1="135" y1="17" x2="153" y2="17" stroke="#30240c" stroke-width="1.6"/>
-      <line x1="96" y1="8" x2="96" y2="26" stroke="#141a2a" stroke-width="1.6"/>
-      <line x1="87" y1="17" x2="105" y2="17" stroke="#141a2a" stroke-width="1.6"/>
-      <line x1="120" y1="8" x2="120" y2="26" stroke="#141a2a" stroke-width="1.6"/>
-      <line x1="111" y1="17" x2="129" y2="17" stroke="#141a2a" stroke-width="1.6"/>
-      <line x1="168" y1="8" x2="168" y2="26" stroke="#141a2a" stroke-width="1.6"/>
-      <line x1="159" y1="17" x2="177" y2="17" stroke="#141a2a" stroke-width="1.6"/>
+      <rect x="78"  y="14" width="24" height="24" rx="4" fill="#0b0f1b" stroke="#1b2233" stroke-width="2"/>
+      <rect x="108" y="14" width="24" height="24" rx="4" fill="#0b0f1b" stroke="#1b2233" stroke-width="2"/>
+      <rect id="logoLit" x="138" y="14" width="24" height="24" rx="4" fill="url(#wl)" stroke="#5a4520" stroke-width="2" filter="url(#lg)"/>
+      <rect x="168" y="14" width="24" height="24" rx="4" fill="#0b0f1b" stroke="#1b2233" stroke-width="2"/>
+      <line x1="150" y1="14" x2="150" y2="38" stroke="#30240c" stroke-width="1.8"/>
+      <line x1="138" y1="26" x2="162" y2="26" stroke="#30240c" stroke-width="1.8"/>
+      <line x1="90" y1="14" x2="90" y2="38" stroke="#141a2a" stroke-width="1.8"/>
+      <line x1="78" y1="26" x2="102" y2="26" stroke="#141a2a" stroke-width="1.8"/>
+      <line x1="120" y1="14" x2="120" y2="38" stroke="#141a2a" stroke-width="1.8"/>
+      <line x1="108" y1="26" x2="132" y2="26" stroke="#141a2a" stroke-width="1.8"/>
+      <line x1="180" y1="14" x2="180" y2="38" stroke="#141a2a" stroke-width="1.8"/>
+      <line x1="168" y1="26" x2="192" y2="26" stroke="#141a2a" stroke-width="1.8"/>
+    </g>
+    <clipPath id="lwClip"><rect x="139" y="15" width="22" height="22" rx="3"/></clipPath>
+    <g clip-path="url(#lwClip)">
+      <g id="logoCatSit" opacity="1">
+        <ellipse cx="150" cy="32.6" rx="4" ry="4.4" fill="#241703"/>
+        <circle cx="150" cy="25.8" r="3.25" fill="#241703"/>
+        <path d="M147.3,23.7 L146.5,20.6 L149.0,22.6 Z" fill="#241703"/>
+        <path d="M152.7,23.7 L153.5,20.6 L151.0,22.6 Z" fill="#241703"/>
+        <path d="M153.9,32.7 q3.4,0.5 3.1,-3.1" stroke="#241703" stroke-width="1.15" fill="none" stroke-linecap="round"/>
+      </g>
+      <g id="logoCatWalk" opacity="0">
+        <ellipse cx="0" cy="-2.3" rx="3.5" ry="2" fill="#241703"/>
+        <circle cx="-3.4" cy="-4" r="1.9" fill="#241703"/>
+        <path d="M-4.6,-5.2 L-5,-7.2 L-3.6,-6 Z" fill="#241703"/>
+        <path d="M-2.4,-5.4 L-2.2,-7.4 L-1,-6 Z" fill="#241703"/>
+        <path d="M3.2,-3 q2.2,-1 1.8,-3.6" stroke="#241703" stroke-width="0.9" fill="none" stroke-linecap="round"/>
+        <line x1="-2" y1="-0.4" x2="-2" y2="0" stroke="#241703" stroke-width="1.1"/>
+        <line x1="2" y1="-0.4" x2="2" y2="0" stroke="#241703" stroke-width="1.1"/>
+      </g>
     </g>
     <text x="135" y="72" text-anchor="middle" fill="#cfc9ba"
       font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif"
@@ -554,6 +595,7 @@ let sources,conflict,numState,activeMirrors;
 let alpha={},target={},delayUntil={},placedAt={},denyAt={},winD={};
 let won=false,winT=0,hueJit=[],litRatio=0,winMax=0;
 let stars=[],roofH=0,groundH=0,hasMask=false,BLDG=[];
+const SHOOT={next:0,a:null};
 let hearts=3,hintsLeft=3,penalizing=false,modalOpen=false;
 let best=parseInt(localStorage.getItem('cl_best')||'0');
 let shakeAt=0,brokenHearts=[],failBulb=null,failMates=new Set();
@@ -831,12 +873,12 @@ function resize(){
   W=r.width;H=r.height;
   cv.width=W*dpr;cv.height=H*dpr;
   ctx.setTransform(dpr,0,0,dpr,0,0);
-  const pad=26;
-  const extra=hasMask?0.15:1.35;
-  cell=Math.min((W-pad*2)/cols,(H-pad*2)/(rows+extra));
-  roofH=hasMask?0:cell*0.75;groundH=hasMask?0:cell*0.38;
+  const pad=26,padB=48;            // altta yazi seridi: zemin cizgisi + 'Level Completed!' payi
+  const extra=hasMask?0.55:0.62;   // sadece ust kapak + zemin payi
+  cell=Math.min((W-pad*2)/cols,(H-pad-padB)/(rows+extra));
+  roofH=0;groundH=hasMask?cell*0.42:cell*0.38;
   gx=(W-cell*cols)/2;
-  gy=(H-cell*rows-roofH-groundH)/2+roofH;
+  gy=H-padB-groundH-cell*rows;     // bina zemine oturur, yazi seridi altta bos kalir
 }
 window.addEventListener('resize',resize);
 
@@ -1278,15 +1320,50 @@ function draw(now){
   const sky=ctx.createLinearGradient(0,0,0,H);
   sky.addColorStop(0,'#04060d');sky.addColorStop(1,'#0a0e1a');
   ctx.fillStyle=sky;ctx.fillRect(0,0,W,H);
-  // yildizlar (partide daha canli kirpar)
-  stars.forEach(st=>{
-    const tw=party?0.4+0.6*Math.abs(Math.sin(now/300+st.ph)):0.55+0.35*Math.sin(now/1400+st.ph);
-    ctx.fillStyle=`rgba(208,218,255,${0.5*tw})`;
-    ctx.beginPath();ctx.arc(st.x*W,st.y*H,st.r,0,Math.PI*2);ctx.fill();
+  // yildizlar: yasam dongusu — belirir, parlar, soner, baska noktada dogar
+  stars.forEach((st,i)=>{
+    if(st.t0===undefined){st.t0=now-Math.random()*7000;st.dur=5000+Math.random()*5000}
+    let pr=(now-st.t0)/st.dur;
+    if(pr>=1){
+      stars[i]={x:Math.random(),y:Math.random(),r:0.6+Math.random()*1.5,
+        ph:Math.random()*7,t0:now,dur:5000+Math.random()*5000};
+      return;
+    }
+    const life=Math.sin(Math.PI*pr);
+    const tw=party?0.5+0.5*Math.abs(Math.sin(now/300+st.ph)):1;
+    ctx.fillStyle=`rgba(208,218,255,${0.85*life*tw})`;
+    ctx.beginPath();ctx.arc(st.x*W,st.y*H,st.r*(0.75+0.25*life),0,Math.PI*2);ctx.fill();
   });
+  // kayan yildiz: ~2 dk'da bir, cok hafif
+  if(!SHOOT.next)SHOOT.next=now+45000+Math.random()*45000; // ilki 45-90 sn icinde
+  if(!SHOOT.a&&now>=SHOOT.next){
+    const dirR=Math.random()<0.5?1:-1;
+    SHOOT.a={t0:now,dur:850,
+      x0:(0.15+Math.random()*0.5)*W,y0:(0.06+Math.random()*0.12)*H,
+      dx:dirR*(0.16+Math.random()*0.06)*W,dy:(0.10+Math.random()*0.05)*H};
+    SHOOT.next=now+100000+Math.random()*50000; // sonrakiler 100-150 sn
+  }
+  if(SHOOT.a){
+    const sa=SHOOT.a,pp=(now-sa.t0)/sa.dur;
+    if(pp>=1){SHOOT.a=null}
+    else{
+      const aS=Math.sin(Math.PI*pp)*0.55;
+      const hx2=sa.x0+sa.dx*pp,hy2=sa.y0+sa.dy*pp;
+      const tl=0.22; // kuyruk (yolun orani)
+      const tx2=sa.x0+sa.dx*Math.max(0,pp-tl),ty2=sa.y0+sa.dy*Math.max(0,pp-tl);
+      const gr=ctx.createLinearGradient(tx2,ty2,hx2,hy2);
+      gr.addColorStop(0,'rgba(210,225,255,0)');
+      gr.addColorStop(1,`rgba(220,232,255,${aS})`);
+      ctx.strokeStyle=gr;
+      ctx.lineWidth=1.4;ctx.lineCap='round';
+      ctx.beginPath();ctx.moveTo(tx2,ty2);ctx.lineTo(hx2,hy2);ctx.stroke();
+      ctx.fillStyle=`rgba(235,242,255,${aS})`;
+      ctx.beginPath();ctx.arc(hx2,hy2,1.6,0,Math.PI*2);ctx.fill();
+    }
+  }
   // hilal: oyuk gokyuzu gradyaniyla dolu (yapay halka yok) + cok hafif suruklenme
-  const mx=W*0.86+Math.sin(now/13000)*W*0.012;
-  const my=H*0.08+Math.cos(now/17000)*H*0.008;
+  const mx=W*0.86+Math.sin(now/12000)*W*0.03;
+  const my=H*0.08+Math.cos(now/16000)*H*0.016;
   const mr=Math.min(W,H)*0.034;
   ctx.fillStyle='rgba(240,234,206,0.9)';
   ctx.beginPath();ctx.arc(mx,my,mr,0,Math.PI*2);ctx.fill();
@@ -1311,36 +1388,12 @@ function draw(now){
     }
   }else{
   const bx=gx-fp,bw=cell*cols+fp*2;
-  const by=gy-roofH,bh=cell*rows+roofH+groundH;
+  const by=gy-cell*0.18,bh=cell*rows+cell*0.18+groundH; // sadece ince ust kapak
   const bodyCol=`rgb(${14+warm*10},${18+warm*7},${32+warm*4})`;
-  // cati ustu siluetler (binadan once, arkada kalsin)
-  const sil='#11151f';
-  // su deposu
-  const tw2=cell*0.55,th=roofH*0.7,tx=bx+bw*0.16;
-  ctx.fillStyle=sil;
-  ctx.fillRect(tx+tw2*0.12,by-th*0.35,tw2*0.1,th*0.35);
-  ctx.fillRect(tx+tw2*0.78,by-th*0.35,tw2*0.1,th*0.35);
-  ctx.fillRect(tx,by-th,tw2,th*0.68);
-  ctx.beginPath();ctx.ellipse(tx+tw2/2,by-th,tw2/2,th*0.16,0,Math.PI,0);ctx.fill();
-  // anten + kirmizi uyari isigi
-  const ax=bx+bw*0.8,ah=roofH*1.05;
-  ctx.strokeStyle=sil;ctx.lineWidth=Math.max(2,cell*0.05);
-  ctx.beginPath();ctx.moveTo(ax,by);ctx.lineTo(ax,by-ah);ctx.stroke();
-  ctx.beginPath();ctx.moveTo(ax-cell*0.16,by-ah*0.45);ctx.lineTo(ax+cell*0.16,by-ah*0.45);ctx.stroke();
-  const blink=party?(Math.sin(now/180)>0?1:0.15):(Math.sin(now/700)>0?1:0.15);
-  ctx.fillStyle=`rgba(255,70,60,${blink})`;
-  ctx.save();
-  if(blink>0.5){ctx.shadowColor='rgba(255,70,60,0.8)';ctx.shadowBlur=8}
-  ctx.beginPath();ctx.arc(ax,by-ah,Math.max(2,cell*0.05),0,Math.PI*2);ctx.fill();
-  ctx.restore();
   // govde
   ctx.fillStyle=bodyCol;
   roundRect(bx,by,bw,bh,8);
   ctx.fill();
-  // parapet cizgisi
-  ctx.strokeStyle='rgba(255,255,255,0.06)';
-  ctx.lineWidth=1.5;
-  ctx.beginPath();ctx.moveTo(bx,by+roofH*0.32);ctx.lineTo(bx+bw,by+roofH*0.32);ctx.stroke();
   // kat cizgileri
   ctx.strokeStyle='rgba(255,255,255,0.025)';
   ctx.lineWidth=1;
@@ -1543,6 +1596,25 @@ function newStar(mid){
 }
 function skyLoop(now){
   if(menuEl.hidden){skyRunning=false;return}
+  // logo kedisi: yavas yasayan dongu
+  const cSit=document.getElementById('logoCatSit');
+  const cWalk=document.getElementById('logoCatWalk');
+  if(cSit&&cWalk){
+    const ct=(now/1000)%14;
+    let sitV=false,walkV=false,wx=0,dir=1;
+    if(ct<6.5)sitV=true;
+    else if(ct<8.5){walkV=true;dir=1;wx=-((ct-6.5)/2)*30}
+    else if(ct<11.5){}
+    else if(ct<13.5){walkV=true;dir=-1;wx=-30+((ct-11.5)/2)*30}
+    else sitV=true;
+    cSit.setAttribute('opacity',sitV?'1':'0');
+    cWalk.setAttribute('opacity',walkV?'1':'0');
+    if(walkV){
+      const bob=Math.sin(now/85)*0.6;
+      cWalk.setAttribute('transform',
+        `translate(${150+wx*1.15},${36.4+bob}) scale(${dir*1.3},1.3)`);
+    }
+  }
   const w=skyCv._w,h=skyCv._h;
   skyCtx.clearRect(0,0,w,h);
   const g=skyCtx.createLinearGradient(0,0,0,h);
