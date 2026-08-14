@@ -1,0 +1,3 @@
+# Unity, Assets/ altindaki her dosya icin .meta uretir; bu depo (HTML prototip)
+# Unity projesinden bagimsiz oldugu icin onlari izlemiyoruz.
+*.meta
